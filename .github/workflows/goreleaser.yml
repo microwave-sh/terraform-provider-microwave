@@ -1,5 +1,12 @@
-# goreleaser: triggered when semantic-release pushes a vX.Y.Z tag. Builds
-# the signed multi-platform artifacts the Terraform Registry pulls.
+# goreleaser: triggered when semantic-release publishes a GitHub Release.
+# Builds the signed multi-platform artifacts the Terraform Registry pulls.
+#
+# The trigger is `release: published`, NOT `push: tags`. semantic-release
+# creates tags via the GitHub API under an App-token identity, and those
+# API-authored tag creates don't reliably fire `push: tags` workflows
+# (v1.0.0 hit this — tag was pushed, goreleaser stayed dormant). The
+# release-published event does fire under the same conditions, which is
+# why microwave-app's deploy.yml uses the same hook.
 #
 # Required secrets: GPG_PRIVATE_KEY + PASSPHRASE for signing. The matching
 # GPG public key must be uploaded to the microwave-sh/microwave namespace
@@ -7,9 +14,9 @@
 name: goreleaser
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types:
+      - published
 
 permissions:
   contents: write
