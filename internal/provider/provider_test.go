@@ -39,11 +39,11 @@ func TestProviderShape(t *testing.T) {
 	}
 
 	resources := p.Resources(context.Background())
-	if len(resources) != 4 {
-		t.Errorf("Resources count: got %d, want 4", len(resources))
+	if len(resources) != 5 {
+		t.Errorf("Resources count: got %d, want 5", len(resources))
 	}
 	dataSources := p.DataSources(context.Background())
-	if len(dataSources) != 4 {
-		t.Errorf("DataSources count: got %d, want 4", len(dataSources))
+	if len(dataSources) != 5 {
+		t.Errorf("DataSources count: got %d, want 5", len(dataSources))
 	}
 }

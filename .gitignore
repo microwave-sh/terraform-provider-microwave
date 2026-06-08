@@ -38,3 +38,4 @@ bin/
 ehthumbs.db
 Thumbs.db
 dist/
+.worktrees/

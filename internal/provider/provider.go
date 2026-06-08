@@ -220,6 +220,7 @@ func (p *MicrowaveProvider) Resources(_ context.Context) []func() resource.Resou
 		NewSigningKeySetResource,
 		NewKeySpecResource,
 		NewTrustExchangeResource,
+		NewTrustProviderResource,
 	}
 }
 
@@ -229,6 +230,7 @@ func (p *MicrowaveProvider) DataSources(_ context.Context) []func() datasource.D
 		NewSigningKeySetDataSource,
 		NewKeySpecDataSource,
 		NewTrustExchangeDataSource,
+		NewTrustProviderDataSource,
 	}
 }
 
