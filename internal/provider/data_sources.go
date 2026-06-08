@@ -289,3 +289,63 @@ func (d *TrustExchangeDataSource) Read(ctx context.Context, req datasource.ReadR
 	resp.Diagnostics.Append(trustExchangeFromWire(ctx, &cfg, out)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &cfg)...)
 }
+
+// ─── trust_provider ──────────────────────────────────────────────────────────
+
+var (
+	_ datasource.DataSource              = &TrustProviderDataSource{}
+	_ datasource.DataSourceWithConfigure = &TrustProviderDataSource{}
+)
+
+type TrustProviderDataSource struct{ client *management.Client }
+
+func NewTrustProviderDataSource() datasource.DataSource { return &TrustProviderDataSource{} }
+
+func (d *TrustProviderDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_trust_provider"
+}
+
+func (d *TrustProviderDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+	c, ok := req.ProviderData.(*management.Client)
+	if !ok {
+		resp.Diagnostics.AddError("Unexpected provider data", fmt.Sprintf("got %T", req.ProviderData))
+		return
+	}
+	d.client = c
+}
+
+func (d *TrustProviderDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Look up an existing trust provider by ID.",
+		Attributes: map[string]schema.Attribute{
+			"id":                 schema.StringAttribute{Required: true},
+			"name":               schema.StringAttribute{Computed: true},
+			"description":        schema.StringAttribute{Computed: true},
+			"type":               schema.StringAttribute{Computed: true},
+			"client_key_spec_id": schema.StringAttribute{Computed: true},
+			"output_key_spec_id": schema.StringAttribute{Computed: true},
+			"policy":             schema.StringAttribute{Computed: true},
+			"active":             schema.BoolAttribute{Computed: true},
+			"created_at":         schema.StringAttribute{Computed: true},
+			"updated_at":         schema.StringAttribute{Computed: true},
+		},
+	}
+}
+
+func (d *TrustProviderDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var cfg trustProviderModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	out, err := d.client.TrustProviders.Get(ctx, cfg.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Lookup trust provider failed", err.Error())
+		return
+	}
+	trustProviderFromWire(&cfg, out)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &cfg)...)
+}
