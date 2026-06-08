@@ -261,7 +261,7 @@ func (d *TrustExchangeDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			"name":               schema.StringAttribute{Computed: true},
 			"description":        schema.StringAttribute{Computed: true},
 			"type":               schema.StringAttribute{Computed: true},
-			"provider":           schema.StringAttribute{Computed: true},
+			"oidc_provider":      schema.StringAttribute{Computed: true},
 			"issuer":             schema.StringAttribute{Computed: true},
 			"discovery_url":      schema.StringAttribute{Computed: true},
 			"jwks_url":           schema.StringAttribute{Computed: true},

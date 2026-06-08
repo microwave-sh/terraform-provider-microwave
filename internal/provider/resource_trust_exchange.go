@@ -34,7 +34,7 @@ type trustExchangeModel struct {
 	Name             types.String `tfsdk:"name"`
 	Description      types.String `tfsdk:"description"`
 	Type             types.String `tfsdk:"type"`
-	Provider         types.String `tfsdk:"provider"`
+	OIDCProvider     types.String `tfsdk:"oidc_provider"`
 	Issuer           types.String `tfsdk:"issuer"`
 	DiscoveryURL     types.String `tfsdk:"discovery_url"`
 	JWKSURL          types.String `tfsdk:"jwks_url"`
@@ -83,9 +83,9 @@ func (r *TrustExchangeResource) Schema(_ context.Context, _ resource.SchemaReque
 				Description: "Exchange type. Only 'oidc' is supported today.",
 				Validators:  []validator.String{stringvalidator.OneOf("oidc")},
 			},
-			"provider": schema.StringAttribute{
+			"oidc_provider": schema.StringAttribute{
 				Required:    true,
-				Description: "Provider shape: github, google, auth0, clerk, custom_oidc. Immutable after creation.",
+				Description: "OIDC provider shape: github, google, auth0, clerk, custom_oidc. Immutable after creation. Named oidc_provider (not provider) because `provider` is a Terraform meta-argument reserved on resource blocks.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -217,7 +217,7 @@ func trustExchangeToWire(ctx context.Context, m *trustExchangeModel) (*managemen
 		Name:             m.Name.ValueString(),
 		Description:      m.Description.ValueString(),
 		Type:             m.Type.ValueString(),
-		Provider:         management.TrustExchangeProvider(m.Provider.ValueString()),
+		Provider:         management.TrustExchangeProvider(m.OIDCProvider.ValueString()),
 		Issuer:           m.Issuer.ValueString(),
 		DiscoveryURL:     m.DiscoveryURL.ValueString(),
 		JWKSURL:          m.JWKSURL.ValueString(),
@@ -239,7 +239,7 @@ func trustExchangeFromWire(ctx context.Context, m *trustExchangeModel, out *mana
 		m.Description = types.StringValue(out.Description)
 	}
 	m.Type = types.StringValue(out.Type)
-	m.Provider = types.StringValue(string(out.Provider))
+	m.OIDCProvider = types.StringValue(string(out.Provider))
 	m.Issuer = types.StringValue(out.Issuer)
 	if out.DiscoveryURL != "" {
 		m.DiscoveryURL = types.StringValue(out.DiscoveryURL)
