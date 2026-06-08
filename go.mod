@@ -32,8 +32,3 @@ require (
 	google.golang.org/grpc v1.79.2 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-// TEMP: dev loop pin while the v0.2.0 tag lands. Remove before tagging the
-// provider's first release — go-releaser must resolve against a real
-// public version, not a sibling worktree.
-replace github.com/microwave-sh/microwave-go => ../microwave-go
