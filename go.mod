@@ -8,6 +8,13 @@ require (
 	github.com/microwave-sh/microwave-go v0.3.0
 )
 
+// TEMPORARY: microwave-go ConnectorsService ships in PR #5 (open at the time
+// this PR was opened). Point at the local SDK worktree so the provider builds
+// while the SDK release is in flight. The controller will remove this replace
+// and bump the require above to the released version (likely v0.4.0) before
+// merging this PR.
+replace github.com/microwave-sh/microwave-go => /Users/sethyates/mataki/microwave/microwave-go/.worktrees/tfp-build
+
 require (
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
