@@ -29,7 +29,7 @@ func TestTrustBindingResource_Schema(t *testing.T) {
 		t.Fatalf("Schema diagnostics: %v", resp.Diagnostics)
 	}
 	wantAttrs := []string{
-		"id", "workspace_id", "binding_type",
+		"id", "binding_type",
 		"identity", "output_claims",
 		"created_at", "updated_at",
 	}
@@ -42,6 +42,9 @@ func TestTrustBindingResource_Schema(t *testing.T) {
 		if _, ok := resp.Schema.Attributes[removed]; ok {
 			t.Errorf("schema must not expose old connector attribute %q", removed)
 		}
+	}
+	if _, ok := resp.Schema.Attributes["workspace_id"]; ok {
+		t.Errorf("schema must not expose workspace_id; workspace scope comes from provider/auth context")
 	}
 }
 
@@ -91,9 +94,6 @@ func TestTrustBindingResource_FromWire(t *testing.T) {
 	if m.ID.ValueString() != "tb_123" {
 		t.Errorf("ID: got %q, want tb_123", m.ID.ValueString())
 	}
-	if m.WorkspaceID.ValueString() != "ws_abc" {
-		t.Errorf("WorkspaceID: got %q, want ws_abc", m.WorkspaceID.ValueString())
-	}
 	if m.BindingType.ValueString() != "terraform_cloud" {
 		t.Errorf("BindingType: got %q, want terraform_cloud", m.BindingType.ValueString())
 	}
@@ -110,7 +110,6 @@ func TestTrustBindingResource_FromWire(t *testing.T) {
 
 func TestTrustBindingResource_RoundTrip(t *testing.T) {
 	original := &trustBindingModel{
-		WorkspaceID: types.StringValue("ws_abc"),
 		BindingType: types.StringValue("terraform_cloud"),
 		Identity: map[string]types.String{
 			"terraform_organization_name": types.StringValue("mataki"),
@@ -123,14 +122,13 @@ func TestTrustBindingResource_RoundTrip(t *testing.T) {
 	in := trustBindingToWire(original)
 	fake := &management.TrustBinding{
 		ID:           "tb_round",
-		WorkspaceID:  original.WorkspaceID.ValueString(),
 		BindingType:  in.BindingType,
 		Identity:     in.Identity,
 		OutputClaims: in.OutputClaims,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
-	roundtripped := &trustBindingModel{WorkspaceID: original.WorkspaceID}
+	roundtripped := &trustBindingModel{}
 	trustBindingFromWire(roundtripped, fake)
 
 	if roundtripped.BindingType.ValueString() != original.BindingType.ValueString() {
@@ -143,30 +141,6 @@ func TestTrustBindingResource_RoundTrip(t *testing.T) {
 	}
 	if roundtripped.OutputClaims["environment"].ValueString() != original.OutputClaims["environment"].ValueString() {
 		t.Errorf("output_claims drifted: %+v -> %+v", original.OutputClaims, roundtripped.OutputClaims)
-	}
-}
-
-func TestTrustBindingResource_splitOnce(t *testing.T) {
-	tests := []struct {
-		in   string
-		want []string
-	}{
-		{"ws_abc/tb_123", []string{"ws_abc", "tb_123"}},
-		{"ws_abc/tb/extra", []string{"ws_abc", "tb/extra"}},
-		{"plain", []string{"plain"}},
-		{"", []string{""}},
-	}
-	for _, tc := range tests {
-		got := splitOnce(tc.in, "/")
-		if len(got) != len(tc.want) {
-			t.Errorf("splitOnce(%q): got %v, want %v", tc.in, got, tc.want)
-			continue
-		}
-		for i := range got {
-			if got[i] != tc.want[i] {
-				t.Errorf("splitOnce(%q)[%d]: got %q, want %q", tc.in, i, got[i], tc.want[i])
-			}
-		}
 	}
 }
 

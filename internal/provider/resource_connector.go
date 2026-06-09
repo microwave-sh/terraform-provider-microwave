@@ -21,7 +21,7 @@ var (
 	_ resource.ResourceWithImportState = &TrustBindingResource{}
 )
 
-// TrustBindingResource manages a workspace Trust Binding. A binding maps a
+// TrustBindingResource manages a Trust Binding. A binding maps a
 // catalog-backed external identity tuple to customer-selected output claims
 // that a Trust Exchange can stamp after lookupBinding resolves it.
 type TrustBindingResource struct {
@@ -30,7 +30,6 @@ type TrustBindingResource struct {
 
 type trustBindingModel struct {
 	ID           types.String            `tfsdk:"id"`
-	WorkspaceID  types.String            `tfsdk:"workspace_id"`
 	BindingType  types.String            `tfsdk:"binding_type"`
 	Identity     map[string]types.String `tfsdk:"identity"`
 	OutputClaims map[string]types.String `tfsdk:"output_claims"`
@@ -64,13 +63,6 @@ func (r *TrustBindingResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:      true,
 				Description:   "Server-assigned Trust Binding ID.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"workspace_id": schema.StringAttribute{
-				Required:    true,
-				Description: "Workspace ID this Trust Binding belongs to. Immutable.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"binding_type": schema.StringAttribute{
 				Required:    true,
@@ -112,7 +104,7 @@ func (r *TrustBindingResource) Create(ctx context.Context, req resource.CreateRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	out, err := r.client.TrustBindings.Create(ctx, plan.WorkspaceID.ValueString(), trustBindingToWire(&plan))
+	out, err := r.client.TrustBindings.Create(ctx, trustBindingToWire(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Create Trust Binding failed", err.Error())
 		return
@@ -127,7 +119,7 @@ func (r *TrustBindingResource) Read(ctx context.Context, req resource.ReadReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	out, err := r.client.TrustBindings.Get(ctx, state.WorkspaceID.ValueString(), state.ID.ValueString())
+	out, err := r.client.TrustBindings.Get(ctx, state.ID.ValueString())
 	if err != nil {
 		if management.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -155,22 +147,13 @@ func (r *TrustBindingResource) Delete(ctx context.Context, req resource.DeleteRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.TrustBindings.Delete(ctx, state.WorkspaceID.ValueString(), state.ID.ValueString()); err != nil && !management.IsNotFound(err) {
+	if err := r.client.TrustBindings.Delete(ctx, state.ID.ValueString()); err != nil && !management.IsNotFound(err) {
 		resp.Diagnostics.AddError("Delete Trust Binding failed", err.Error())
 	}
 }
 
 func (r *TrustBindingResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	parts := splitOnce(req.ID, "/")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		resp.Diagnostics.AddError(
-			"Invalid import ID",
-			"Expected '<workspace_id>/<trust_binding_id>', got: "+req.ID,
-		)
-		return
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), parts[0])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
 func trustBindingToWire(m *trustBindingModel) *management.TrustBindingInput {
@@ -183,7 +166,6 @@ func trustBindingToWire(m *trustBindingModel) *management.TrustBindingInput {
 
 func trustBindingFromWire(m *trustBindingModel, out *management.TrustBinding) {
 	m.ID = types.StringValue(out.ID)
-	m.WorkspaceID = types.StringValue(out.WorkspaceID)
 	m.BindingType = types.StringValue(string(out.BindingType))
 	m.Identity = anyMapToStringMap(out.Identity)
 	m.OutputClaims = anyMapToStringMap(out.OutputClaims)
@@ -215,13 +197,4 @@ func anyMapToStringMap(in map[string]any) map[string]types.String {
 		out[key] = types.StringValue(fmt.Sprint(value))
 	}
 	return out
-}
-
-func splitOnce(s, sep string) []string {
-	for i := 0; i+len(sep) <= len(s); i++ {
-		if s[i:i+len(sep)] == sep {
-			return []string{s[:i], s[i+len(sep):]}
-		}
-	}
-	return []string{s}
 }
