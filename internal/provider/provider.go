@@ -221,7 +221,7 @@ func (p *MicrowaveProvider) Resources(_ context.Context) []func() resource.Resou
 		NewKeySpecResource,
 		NewTrustExchangeResource,
 		NewTrustProviderResource,
-		NewConnectorResource,
+		NewTrustBindingResource,
 	}
 }
 

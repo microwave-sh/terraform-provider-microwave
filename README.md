@@ -39,7 +39,7 @@ Pick exactly one auth path per provider block. The provider rejects "both set" a
 | `microwave_key_spec` | Key specifications — opaque + JWT formats |
 | `microwave_trust_exchange` | OIDC federation rules with CEL policy gates |
 | `microwave_trust_provider` | Inverse exchange — Microwave mints tokens for downstream consumers |
-| `microwave_connector` | Workspace federation connectors (Terraform Cloud, GitHub Actions) consumed by SYSTEM Trust Exchanges |
+| `microwave_trust_binding` | Trust Binding instances consumed by Trust Exchanges |
 
 Matching `data.microwave_*` data sources look up any of the above by ID.
 
