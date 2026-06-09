@@ -8,6 +8,12 @@ require (
 	github.com/microwave-sh/microwave-go v0.3.0
 )
 
+// TEMPORARY: microwave-go TrustBindingsService ships in the stacked SDK PR.
+// Point at the local SDK worktree so the provider builds while the SDK release
+// is in flight. The controller will remove this replace and bump the require
+// above before merging this PR.
+replace github.com/microwave-sh/microwave-go => /Users/sethyates/mataki/microwave/microwave-go/.worktrees/connectors
+
 require (
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
