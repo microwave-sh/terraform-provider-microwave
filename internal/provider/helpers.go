@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -32,4 +33,34 @@ func stringSliceToList(ctx context.Context, vals []string) (types.List, diagnost
 		vals = []string{}
 	}
 	return types.ListValueFrom(ctx, types.StringType, vals)
+}
+
+// stringMapToAny converts a map of TF string values to a map of any, used
+// when building wire-format request bodies for map fields (identity, output_claims).
+func stringMapToAny(in map[string]types.String) map[string]any {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(in))
+	for key, value := range in {
+		out[key] = value.ValueString()
+	}
+	return out
+}
+
+// anyMapToStringMap converts a map[string]any wire response back into a
+// map of TF string values. Non-string values are stringified via fmt.Sprint.
+func anyMapToStringMap(in map[string]any) map[string]types.String {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]types.String, len(in))
+	for key, value := range in {
+		if s, ok := value.(string); ok {
+			out[key] = types.StringValue(s)
+			continue
+		}
+		out[key] = types.StringValue(fmt.Sprint(value))
+	}
+	return out
 }

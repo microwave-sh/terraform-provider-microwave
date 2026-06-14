@@ -12,24 +12,24 @@ import (
 	"github.com/microwave-sh/microwave-go/management"
 )
 
-func TestTrustBindingResource_Metadata(t *testing.T) {
-	r := NewTrustBindingResource()
+func TestTrustFederationBindingResource_Metadata(t *testing.T) {
+	r := NewTrustFederationBindingResource()
 	var resp tfresource.MetadataResponse
 	r.Metadata(context.Background(), tfresource.MetadataRequest{ProviderTypeName: "microwave"}, &resp)
-	if resp.TypeName != "microwave_trust_binding" {
-		t.Errorf("TypeName: got %q, want microwave_trust_binding", resp.TypeName)
+	if resp.TypeName != "microwave_trust_federation_binding" {
+		t.Errorf("TypeName: got %q, want microwave_trust_federation_binding", resp.TypeName)
 	}
 }
 
-func TestTrustBindingResource_Schema(t *testing.T) {
-	r := NewTrustBindingResource()
+func TestTrustFederationBindingResource_Schema(t *testing.T) {
+	r := NewTrustFederationBindingResource()
 	var resp tfresource.SchemaResponse
 	r.Schema(context.Background(), tfresource.SchemaRequest{}, &resp)
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("Schema diagnostics: %v", resp.Diagnostics)
 	}
 	wantAttrs := []string{
-		"id", "binding_type",
+		"id", "federation_key",
 		"identity", "output_claims",
 		"created_at", "updated_at",
 	}
@@ -38,19 +38,20 @@ func TestTrustBindingResource_Schema(t *testing.T) {
 			t.Errorf("schema missing attribute %q", name)
 		}
 	}
-	for _, removed := range []string{"provider", "provider_type", "terraform_cloud", "github_actions"} {
+	// Ensure old attribute name is gone.
+	for _, removed := range []string{
+		"binding_type", "provider", "provider_type",
+		"terraform_cloud", "github_actions", "workspace_id",
+	} {
 		if _, ok := resp.Schema.Attributes[removed]; ok {
-			t.Errorf("schema must not expose old connector attribute %q", removed)
+			t.Errorf("schema must not expose old attribute %q", removed)
 		}
-	}
-	if _, ok := resp.Schema.Attributes["workspace_id"]; ok {
-		t.Errorf("schema must not expose workspace_id; workspace scope comes from provider/auth context")
 	}
 }
 
-func TestTrustBindingResource_ToWire(t *testing.T) {
-	model := &trustBindingModel{
-		BindingType: types.StringValue("terraform_cloud"),
+func TestTrustFederationBindingResource_ToWire(t *testing.T) {
+	model := &trustFederationBindingModel{
+		FederationKey: types.StringValue("terraform_cloud"),
 		Identity: map[string]types.String{
 			"terraform_organization_name": types.StringValue("mataki"),
 			"terraform_workspace_name":    types.StringValue("sandbar-microwave"),
@@ -59,9 +60,11 @@ func TestTrustBindingResource_ToWire(t *testing.T) {
 			"environment": types.StringValue("prod"),
 		},
 	}
-	in := trustBindingToWire(model)
-	if in.BindingType != management.TrustBindingTypeTerraformCloud {
-		t.Errorf("BindingType: got %q, want terraform_cloud", in.BindingType)
+	in := trustFederationBindingToWire(model)
+	// The SDK no longer exports TrustBindingTypeTerraformCloud; compare against
+	// the bare string "terraform_cloud" instead.
+	if string(in.FederationKey) != "terraform_cloud" {
+		t.Errorf("FederationKey: got %q, want terraform_cloud", in.FederationKey)
 	}
 	if in.Identity["terraform_organization_name"] != "mataki" {
 		t.Errorf("Identity: got %+v", in.Identity)
@@ -71,12 +74,12 @@ func TestTrustBindingResource_ToWire(t *testing.T) {
 	}
 }
 
-func TestTrustBindingResource_FromWire(t *testing.T) {
+func TestTrustFederationBindingResource_FromWire(t *testing.T) {
 	now := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
-	out := &management.TrustBinding{
-		ID:          "tb_123",
-		WorkspaceID: "ws_abc",
-		BindingType: management.TrustBindingTypeTerraformCloud,
+	out := &management.TrustFederationBinding{
+		ID:            "tfb_123",
+		WorkspaceID:   "ws_abc",
+		FederationKey: management.FederationKey("terraform_cloud"),
 		Identity: map[string]any{
 			"terraform_organization_name": "mataki",
 			"terraform_workspace_name":    "sandbar-microwave",
@@ -88,14 +91,14 @@ func TestTrustBindingResource_FromWire(t *testing.T) {
 		UpdatedAt: now,
 	}
 
-	m := &trustBindingModel{}
-	trustBindingFromWire(m, out)
+	m := &trustFederationBindingModel{}
+	trustFederationBindingFromWire(m, out)
 
-	if m.ID.ValueString() != "tb_123" {
-		t.Errorf("ID: got %q, want tb_123", m.ID.ValueString())
+	if m.ID.ValueString() != "tfb_123" {
+		t.Errorf("ID: got %q, want tfb_123", m.ID.ValueString())
 	}
-	if m.BindingType.ValueString() != "terraform_cloud" {
-		t.Errorf("BindingType: got %q, want terraform_cloud", m.BindingType.ValueString())
+	if m.FederationKey.ValueString() != "terraform_cloud" {
+		t.Errorf("FederationKey: got %q, want terraform_cloud", m.FederationKey.ValueString())
 	}
 	if m.Identity["terraform_workspace_name"].ValueString() != "sandbar-microwave" {
 		t.Errorf("Identity: got %+v", m.Identity)
@@ -108,9 +111,9 @@ func TestTrustBindingResource_FromWire(t *testing.T) {
 	}
 }
 
-func TestTrustBindingResource_RoundTrip(t *testing.T) {
-	original := &trustBindingModel{
-		BindingType: types.StringValue("terraform_cloud"),
+func TestTrustFederationBindingResource_RoundTrip(t *testing.T) {
+	original := &trustFederationBindingModel{
+		FederationKey: types.StringValue("terraform_cloud"),
 		Identity: map[string]types.String{
 			"terraform_organization_name": types.StringValue("mataki"),
 			"terraform_workspace_name":    types.StringValue("sandbar-microwave"),
@@ -119,22 +122,22 @@ func TestTrustBindingResource_RoundTrip(t *testing.T) {
 			"environment": types.StringValue("prod"),
 		},
 	}
-	in := trustBindingToWire(original)
-	fake := &management.TrustBinding{
-		ID:           "tb_round",
-		BindingType:  in.BindingType,
-		Identity:     in.Identity,
-		OutputClaims: in.OutputClaims,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+	in := trustFederationBindingToWire(original)
+	fake := &management.TrustFederationBinding{
+		ID:            "tfb_round",
+		FederationKey: in.FederationKey,
+		Identity:      in.Identity,
+		OutputClaims:  in.OutputClaims,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
-	roundtripped := &trustBindingModel{}
-	trustBindingFromWire(roundtripped, fake)
+	roundtripped := &trustFederationBindingModel{}
+	trustFederationBindingFromWire(roundtripped, fake)
 
-	if roundtripped.BindingType.ValueString() != original.BindingType.ValueString() {
-		t.Errorf("BindingType drifted: %q -> %q",
-			original.BindingType.ValueString(),
-			roundtripped.BindingType.ValueString())
+	if roundtripped.FederationKey.ValueString() != original.FederationKey.ValueString() {
+		t.Errorf("FederationKey drifted: %q -> %q",
+			original.FederationKey.ValueString(),
+			roundtripped.FederationKey.ValueString())
 	}
 	if roundtripped.Identity["terraform_organization_name"].ValueString() != original.Identity["terraform_organization_name"].ValueString() {
 		t.Errorf("identity drifted: %+v -> %+v", original.Identity, roundtripped.Identity)
@@ -144,13 +147,9 @@ func TestTrustBindingResource_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestAccTrustBinding(t *testing.T) {
-	if testingShortAcc() {
-		t.Skip("TF_ACC not set; acceptance test deferred to v0.2 rig")
+func TestAccTrustFederationBinding(t *testing.T) {
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("TF_ACC not set; acceptance test deferred")
 	}
 	t.Skip("acceptance test rig not yet wired (see provider_test.go); deferred to v0.2")
-}
-
-func testingShortAcc() bool {
-	return os.Getenv("TF_ACC") == ""
 }
