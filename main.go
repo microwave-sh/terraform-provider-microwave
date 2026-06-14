@@ -14,7 +14,7 @@ import (
 )
 
 // version is overridden at link time by goreleaser via -ldflags "-X main.version=...".
-var version = "1.1.2"
+var version = "1.2.0"
 
 func main() {
 	var debug bool
