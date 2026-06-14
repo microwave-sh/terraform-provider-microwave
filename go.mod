@@ -5,14 +5,8 @@ go 1.26.1
 require (
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
-	github.com/microwave-sh/microwave-go v0.3.0
+	github.com/microwave-sh/microwave-go v0.4.0
 )
-
-// TEMPORARY: microwave-go TrustFederationsService + TrustFederationBindingsService
-// ship in the stacked SDK PR (microwave-go#5). Point at the local SDK worktree
-// so the provider builds while the SDK release is in flight. Remove this replace
-// and bump the require version once the SDK is published.
-replace github.com/microwave-sh/microwave-go => /Users/sethyates/mataki/microwave/microwave-go/.worktrees/connectors
 
 require (
 	github.com/fatih/color v1.18.0 // indirect
