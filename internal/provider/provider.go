@@ -7,8 +7,15 @@
 package provider
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -31,12 +38,13 @@ type MicrowaveProvider struct {
 // is Optional — the constraints are enforced in Configure where we have
 // access to env-var fallbacks and can emit useful diagnostics.
 type ProviderModel struct {
-	Endpoint         types.String `tfsdk:"endpoint"`
-	WorkspaceID      types.String `tfsdk:"workspace_id"`
-	ManagementKey    types.String `tfsdk:"management_key"`
-	AuthEndpoint     types.String `tfsdk:"auth_endpoint"`
-	TrustExchangeID  types.String `tfsdk:"trust_exchange_id"`
-	WorkloadTokenEnv types.String `tfsdk:"workload_token_env"`
+	Endpoint          types.String `tfsdk:"endpoint"`
+	WorkspaceID       types.String `tfsdk:"workspace_id"`
+	ManagementKey     types.String `tfsdk:"management_key"`
+	AuthEndpoint      types.String `tfsdk:"auth_endpoint"`
+	TrustExchangeID   types.String `tfsdk:"trust_exchange_id"`
+	TrustFederationID types.String `tfsdk:"trust_federation_id"`
+	WorkloadTokenEnv  types.String `tfsdk:"workload_token_env"`
 }
 
 // New constructs the provider factory consumed by main and by acceptance
@@ -67,7 +75,7 @@ func (p *MicrowaveProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 			"management_key": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Static Microwave management key (mw_live_...). Set this OR (trust_exchange_id + a workload identity token in the env), not both. Override via MICROWAVE_MANAGEMENT_KEY.",
+				Description: "Static Microwave management key (mw_live_...). Set this OR a federated auth mode, not both. Override via MICROWAVE_MANAGEMENT_KEY.",
 			},
 			"auth_endpoint": schema.StringAttribute{
 				Optional:    true,
@@ -76,6 +84,10 @@ func (p *MicrowaveProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 			"trust_exchange_id": schema.StringAttribute{
 				Optional:    true,
 				Description: "Trust Exchange ID to redeem the workload-identity OIDC token against. Required for federated auth; mutually exclusive with management_key.",
+			},
+			"trust_federation_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "Trust Federation ID to redeem the workload-identity OIDC token against. Required for SYSTEM federation auth; mutually exclusive with management_key and trust_exchange_id.",
 			},
 			"workload_token_env": schema.StringAttribute{
 				Optional:    true,
@@ -101,16 +113,17 @@ func (p *MicrowaveProvider) Configure(ctx context.Context, req provider.Configur
 	managementKey := firstNonEmpty(config.ManagementKey.ValueString(), os.Getenv("MICROWAVE_MANAGEMENT_KEY"))
 	authEndpoint := firstNonEmpty(config.AuthEndpoint.ValueString(), os.Getenv("MICROWAVE_AUTH_ENDPOINT"))
 	exchangeID := config.TrustExchangeID.ValueString()
+	federationID := config.TrustFederationID.ValueString()
 	tokenEnv := firstNonEmpty(config.WorkloadTokenEnv.ValueString(), "TFC_WORKLOAD_IDENTITY_TOKEN")
 
 	// Path A — static management key. Wins when present so dev workflows
 	// (export MICROWAVE_MANAGEMENT_KEY=mw_live_...) keep working even inside a
 	// TFC run that also has TFC_WORKLOAD_IDENTITY_TOKEN set.
 	if managementKey != "" {
-		if exchangeID != "" {
+		if exchangeID != "" || federationID != "" {
 			resp.Diagnostics.AddError(
 				"Conflicting auth configuration",
-				"Both management_key (or MICROWAVE_MANAGEMENT_KEY) and trust_exchange_id are set. Pick exactly one auth mode per provider block.",
+				"management_key (or MICROWAVE_MANAGEMENT_KEY), trust_exchange_id, and trust_federation_id are mutually exclusive. Pick exactly one auth mode per provider block.",
 			)
 			return
 		}
@@ -118,7 +131,15 @@ func (p *MicrowaveProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	// Path B — OIDC federation. The provider holds no static credential;
+	if exchangeID != "" && federationID != "" {
+		resp.Diagnostics.AddError(
+			"Conflicting auth configuration",
+			"trust_exchange_id and trust_federation_id are mutually exclusive. Pick exactly one federated auth mode per provider block.",
+		)
+		return
+	}
+
+	// Path B — OIDC Trust Exchange. The provider holds no static credential;
 	// each Terraform run mints a fresh session JWT against the configured
 	// Trust Exchange using the workload-identity token TFC (or a CI workflow)
 	// has injected into the runner.
@@ -140,9 +161,30 @@ func (p *MicrowaveProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
+	// Path C — OIDC Trust Federation. This is the SYSTEM provider-auth path for
+	// TFC workspaces: Microwave looks up the Trust Federation Binding for the
+	// inbound identity tuple and mints a Management API bearer JWT.
+	if federationID != "" {
+		token := os.Getenv(tokenEnv)
+		if token == "" {
+			resp.Diagnostics.AddError(
+				"Missing workload identity token",
+				"trust_federation_id is set but the environment variable "+tokenEnv+" is empty. In Terraform Cloud, confirm TFC_WORKLOAD_IDENTITY_AUDIENCE is configured on the workspace; locally, export the env var before running terraform.",
+			)
+			return
+		}
+		sessionJWT, err := redeemFederationSessionJWT(ctx, endpoint, federationID, token)
+		if err != nil {
+			resp.Diagnostics.AddError("Federation redemption failed", err.Error())
+			return
+		}
+		p.buildClient(ctx, endpoint, workspaceID, sessionJWT, resp)
+		return
+	}
+
 	resp.Diagnostics.AddError(
 		"Missing auth configuration",
-		"Provider needs either management_key (or MICROWAVE_MANAGEMENT_KEY env) OR trust_exchange_id with a workload identity token in "+tokenEnv+".",
+		"Provider needs either management_key (or MICROWAVE_MANAGEMENT_KEY env), trust_exchange_id, or trust_federation_id with a workload identity token in "+tokenEnv+".",
 	)
 }
 
@@ -186,6 +228,47 @@ func redeemSessionJWT(ctx context.Context, authEndpoint, exchangeID, externalTok
 		return "", &exchangeDeniedError{code: result.Code, ruleResults: result.RuleResults}
 	}
 	return result.JWT, nil
+}
+
+func redeemFederationSessionJWT(ctx context.Context, endpoint, federationID, externalToken string) (string, error) {
+	if endpoint == "" {
+		endpoint = management.DefaultEndpoint
+	}
+	body, err := json.Marshal(struct {
+		Token string `json:"token"`
+	}{Token: externalToken})
+	if err != nil {
+		return "", err
+	}
+	redemptionURL := strings.TrimRight(endpoint, "/") + "/api/trust-federations/" + url.PathEscape(federationID) + "/redeem"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, redemptionURL, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "terraform-provider-microwave")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("microwave: federation redemption request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	respBody, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return "", fmt.Errorf("microwave: read federation redemption response: %w", readErr)
+	}
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("microwave: federation redemption failed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+	var result management.RedeemFederationResult
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("microwave: decode federation redemption response: %w", err)
+	}
+	if result.Token == "" {
+		return "", fmt.Errorf("microwave: federation redemption returned empty token")
+	}
+	return result.Token, nil
 }
 
 // exchangeDeniedError surfaces the CEL rule breakdown so operators can fix

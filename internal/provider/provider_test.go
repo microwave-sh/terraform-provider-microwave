@@ -32,7 +32,7 @@ func TestProviderShape(t *testing.T) {
 	if schemaResp.Diagnostics.HasError() {
 		t.Fatalf("Schema diagnostics: %v", schemaResp.Diagnostics)
 	}
-	for _, want := range []string{"endpoint", "management_key", "trust_exchange_id", "workspace_id", "auth_endpoint", "workload_token_env"} {
+	for _, want := range []string{"endpoint", "management_key", "trust_exchange_id", "trust_federation_id", "workspace_id", "auth_endpoint", "workload_token_env"} {
 		if _, ok := schemaResp.Schema.Attributes[want]; !ok {
 			t.Errorf("provider schema missing attribute %q", want)
 		}
