@@ -128,7 +128,11 @@ func (r *KeySpecResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Attributes: map[string]schema.Attribute{
 					"algorithm": schema.StringAttribute{
 						Optional:    true,
-						Description: "Override the signing key set's algorithm. Usually leave unset.",
+						Computed:    true,
+						Description: "JWT signing algorithm. Server-derived from the signing key set; leave unset.",
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
 					},
 					"issuer": schema.StringAttribute{
 						Computed:    true,
