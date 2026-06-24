@@ -56,3 +56,25 @@ func TestRedeemFederationSessionJWTRejectsEmptyToken(t *testing.T) {
 		t.Fatal("redeemFederationSessionJWT error = nil, want non-nil")
 	}
 }
+
+func TestDefaultFederationKey(t *testing.T) {
+	cases := []struct {
+		name                              string
+		mgmtKey, exchangeID, federationID string
+		tokenPresent                      bool
+		want                              string
+	}{
+		{name: "zero config with token defaults to terraform_cloud", tokenPresent: true, want: "terraform_cloud"},
+		{name: "zero config without token does not default", tokenPresent: false, want: ""},
+		{name: "explicit management_key is not overridden", mgmtKey: "mw_live_x", tokenPresent: true, want: ""},
+		{name: "explicit trust_exchange_id is not overridden", exchangeID: "ex_1", tokenPresent: true, want: ""},
+		{name: "explicit trust_federation_id is not overridden", federationID: "tf_1", tokenPresent: true, want: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := defaultFederationKey(tc.mgmtKey, tc.exchangeID, tc.federationID, tc.tokenPresent); got != tc.want {
+				t.Fatalf("defaultFederationKey = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
