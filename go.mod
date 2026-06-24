@@ -5,7 +5,7 @@ go 1.26.1
 require (
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
-	github.com/microwave-sh/microwave-go v0.4.0
+	github.com/microwave-sh/microwave-go v0.5.0
 )
 
 require (
