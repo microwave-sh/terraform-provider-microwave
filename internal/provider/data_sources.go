@@ -55,9 +55,10 @@ func (d *PermissionSetDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"resource":   schema.StringAttribute{Computed: true},
-						"action":     schema.StringAttribute{Computed: true},
-						"constraint": schema.StringAttribute{Computed: true},
+						"name":        schema.StringAttribute{Computed: true},
+						"label":       schema.StringAttribute{Computed: true},
+						"description": schema.StringAttribute{Computed: true},
+						"dangerous":   schema.BoolAttribute{Computed: true},
 					},
 				},
 			},

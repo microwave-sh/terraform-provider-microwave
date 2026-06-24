@@ -51,10 +51,9 @@ resource "microwave_permission_set" "deployer" {
   name        = "deployer"
   description = "Deploy + upload, no destructive ops"
   permissions = [
-    { resource = "deploys", action = "create" },
-    { resource = "deploys", action = "activate" },
-    { resource = "blobs", action = "upload" },
-    { resource = "sites", action = "read" },
+    { name = "deploys:write", label = "Write deploys" },
+    { name = "deploys:read", label = "Read deploys" },
+    { name = "sites:read", label = "Read sites" },
   ]
 }
 

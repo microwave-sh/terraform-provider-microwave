@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -40,9 +41,10 @@ type permissionSetModel struct {
 }
 
 type permissionModel struct {
-	Resource   types.String `tfsdk:"resource"`
-	Action     types.String `tfsdk:"action"`
-	Constraint types.String `tfsdk:"constraint"`
+	Name        types.String `tfsdk:"name"`
+	Label       types.String `tfsdk:"label"`
+	Description types.String `tfsdk:"description"`
+	Dangerous   types.Bool   `tfsdk:"dangerous"`
 }
 
 func NewPermissionSetResource() resource.Resource { return &PermissionSetResource{} }
@@ -65,7 +67,7 @@ func (r *PermissionSetResource) Configure(_ context.Context, req resource.Config
 
 func (r *PermissionSetResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "A Microwave permission set: a named bundle of (resource, action) grants bound into one or more key specs.",
+		Description: "A Microwave permission set: a named bundle of scope grants bound into one or more key specs.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -82,20 +84,26 @@ func (r *PermissionSetResource) Schema(_ context.Context, _ resource.SchemaReque
 			},
 			"permissions": schema.ListNestedAttribute{
 				Required:    true,
-				Description: "Grants in this set. Sent wholesale on every Update — the API does not support partial diffs.",
+				Description: "Scope grants in this set. Sent wholesale on every Update — the API does not support partial diffs.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"resource": schema.StringAttribute{
+						"name": schema.StringAttribute{
 							Required:    true,
-							Description: "Resource name (e.g. deploys, blobs, sites).",
+							Description: "Scope string the API enforces (e.g. \"deploys:write\", or \"*\" for full access).",
 						},
-						"action": schema.StringAttribute{
+						"label": schema.StringAttribute{
 							Required:    true,
-							Description: "Action verb (e.g. create, read, update, delete, *).",
+							Description: "Human-readable title for the scope.",
 						},
-						"constraint": schema.StringAttribute{
+						"description": schema.StringAttribute{
 							Optional:    true,
-							Description: "Optional CEL expression scoping the grant.",
+							Description: "Optional longer description of the grant.",
+						},
+						"dangerous": schema.BoolAttribute{
+							Optional:    true,
+							Computed:    true,
+							Default:     booldefault.StaticBool(false),
+							Description: "Marks grants that warrant extra confirmation in UIs.",
 						},
 					},
 				},
@@ -195,9 +203,10 @@ func permissionsToWire(in []permissionModel) []management.PermissionInput {
 	out := make([]management.PermissionInput, 0, len(in))
 	for _, p := range in {
 		out = append(out, management.PermissionInput{
-			Resource:   p.Resource.ValueString(),
-			Action:     p.Action.ValueString(),
-			Constraint: p.Constraint.ValueString(),
+			Name:        p.Name.ValueString(),
+			Label:       p.Label.ValueString(),
+			Description: p.Description.ValueString(),
+			Dangerous:   p.Dangerous.ValueBool(),
 		})
 	}
 	return out
@@ -207,13 +216,14 @@ func permissionsFromWire(in []management.Permission) []permissionModel {
 	out := make([]permissionModel, 0, len(in))
 	for _, p := range in {
 		m := permissionModel{
-			Resource: types.StringValue(p.Resource),
-			Action:   types.StringValue(p.Action),
+			Name:      types.StringValue(p.Name),
+			Label:     types.StringValue(p.Label),
+			Dangerous: types.BoolValue(p.Dangerous),
 		}
-		if p.Constraint != "" {
-			m.Constraint = types.StringValue(p.Constraint)
+		if p.Description != "" {
+			m.Description = types.StringValue(p.Description)
 		} else {
-			m.Constraint = types.StringNull()
+			m.Description = types.StringNull()
 		}
 		out = append(out, m)
 	}
