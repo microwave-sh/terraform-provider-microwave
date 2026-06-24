@@ -27,6 +27,24 @@ import (
 	"github.com/microwave-sh/microwave-go/management"
 )
 
+// defaultSystemFederationKey is the well-known key of the Microwave SYSTEM
+// Trust Federation for Terraform Cloud. It is stable across every Microwave
+// deployment (the federation's tf_ id is randomly generated per deployment), so
+// it is the safe value to default to when no auth mode is configured.
+const defaultSystemFederationKey = "terraform_cloud"
+
+// defaultFederationKey returns the zero-config federation key to use when no
+// explicit auth mode is configured but a workload-identity token is present.
+// It returns "" when any explicit auth mode is set or no token is available,
+// so existing management_key / trust_exchange_id / trust_federation_id configs
+// are never overridden.
+func defaultFederationKey(managementKey, exchangeID, federationID string, tokenPresent bool) string {
+	if managementKey == "" && exchangeID == "" && federationID == "" && tokenPresent {
+		return defaultSystemFederationKey
+	}
+	return ""
+}
+
 // MicrowaveProvider implements provider.Provider. The version field is wired
 // in from main.go so panic stack traces and the registry-listed version match
 // the binary that runs.
@@ -87,7 +105,7 @@ func (p *MicrowaveProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 			},
 			"trust_federation_id": schema.StringAttribute{
 				Optional:    true,
-				Description: "Trust Federation ID to redeem the workload-identity OIDC token against. Required for SYSTEM federation auth; mutually exclusive with management_key and trust_exchange_id.",
+				Description: "Trust Federation to redeem the workload-identity OIDC token against: a federation id (tf_...) or a well-known SYSTEM key (e.g. \"terraform_cloud\"). Mutually exclusive with management_key and trust_exchange_id. When no auth mode is set and a workload-identity token is present, this defaults to \"terraform_cloud\".",
 			},
 			"workload_token_env": schema.StringAttribute{
 				Optional:    true,
@@ -115,6 +133,14 @@ func (p *MicrowaveProvider) Configure(ctx context.Context, req provider.Configur
 	exchangeID := config.TrustExchangeID.ValueString()
 	federationID := config.TrustFederationID.ValueString()
 	tokenEnv := firstNonEmpty(config.WorkloadTokenEnv.ValueString(), "TFC_WORKLOAD_IDENTITY_TOKEN")
+
+	// Zero-config default: on a run that has a workload-identity token but no
+	// explicit auth mode, default to SYSTEM Trust Federation against the
+	// well-known "terraform_cloud" key (stable across deployments, unlike the
+	// federation's randomly-generated tf_ id), so callers need no extra variable.
+	if def := defaultFederationKey(managementKey, exchangeID, federationID, os.Getenv(tokenEnv) != ""); def != "" {
+		federationID = def
+	}
 
 	// Path A — static management key. Wins when present so dev workflows
 	// (export MICROWAVE_MANAGEMENT_KEY=mw_live_...) keep working even inside a
