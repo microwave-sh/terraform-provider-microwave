@@ -51,7 +51,7 @@ func (d *PermissionSetDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			"id":          schema.StringAttribute{Required: true},
 			"name":        schema.StringAttribute{Computed: true},
 			"description": schema.StringAttribute{Computed: true},
-			"permissions": schema.ListNestedAttribute{
+			"permissions": schema.SetNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{

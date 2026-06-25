@@ -82,9 +82,9 @@ func (r *PermissionSetResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Description: "Human-readable description.",
 			},
-			"permissions": schema.ListNestedAttribute{
+			"permissions": schema.SetNestedAttribute{
 				Required:    true,
-				Description: "Scope grants in this set. Sent wholesale on every Update — the API does not support partial diffs.",
+				Description: "Scope grants in this set (unordered). Sent wholesale on every Update — the API does not support partial diffs.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
