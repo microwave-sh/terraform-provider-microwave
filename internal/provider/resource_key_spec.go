@@ -55,6 +55,7 @@ type claimPolicyModel struct {
 	Key         types.String `tfsdk:"key"`
 	Mode        types.String `tfsdk:"mode"`
 	Type        types.String `tfsdk:"type"`
+	Value       types.String `tfsdk:"value"`
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
 }
@@ -190,14 +191,18 @@ func (r *KeySpecResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						},
 						"mode": schema.StringAttribute{
 							Required:    true,
-							Description: "not_allowed (reject if present), allowed (pass through if present), or required (must be present).",
+							Description: "not_allowed (reject if present), allowed (pass through if present), required (must be present), default (stamp value when absent), or override (always stamp value). default/override require value.",
 							Validators: []validator.String{
-								stringvalidator.OneOf("not_allowed", "allowed", "required"),
+								stringvalidator.OneOf("not_allowed", "allowed", "required", "default", "override"),
 							},
 						},
 						"type": schema.StringAttribute{
 							Optional:    true,
 							Description: "Value type the claim is checked against: string, number, boolean, object, or array. Omit to skip type checking.",
+						},
+						"value": schema.StringAttribute{
+							Optional:    true,
+							Description: "Constant value for default/override modes (e.g. the aud audience). A JWT spec must declare an aud claim with mode default or override and a value, since minted session tokens carry no inbound audience.",
 						},
 						"name": schema.StringAttribute{
 							Optional:    true,
@@ -332,13 +337,20 @@ func claimsToWire(in []claimPolicyModel) []management.ClaimPolicy {
 	}
 	out := make([]management.ClaimPolicy, 0, len(in))
 	for _, c := range in {
-		out = append(out, management.ClaimPolicy{
+		row := management.ClaimPolicy{
 			Key:         c.Key.ValueString(),
 			Mode:        c.Mode.ValueString(),
 			Type:        c.Type.ValueString(),
 			Name:        c.Name.ValueString(),
 			Description: c.Description.ValueString(),
-		})
+		}
+		// Value backs the default/override modes (e.g. the aud audience). Send it
+		// only when set so allowed/required rows stay value-less.
+		if !c.Value.IsNull() && !c.Value.IsUnknown() {
+			v := any(c.Value.ValueString())
+			row.Value = &v
+		}
+		out = append(out, row)
 	}
 	return out
 }
