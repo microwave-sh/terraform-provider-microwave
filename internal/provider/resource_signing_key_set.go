@@ -124,9 +124,9 @@ func (r *SigningKeySetResource) Read(ctx context.Context, req resource.ReadReque
 		resp.Diagnostics.AddError("Read signing key set failed", err.Error())
 		return
 	}
-	state.ID = types.StringValue(out.ID)
-	state.Algorithm = types.StringValue(out.Algorithm)
-	state.CreatedAt = types.StringValue(out.CreatedAt.Format(timeFormat))
+	state.ID = types.StringValue(out.Set.ID)
+	state.Algorithm = types.StringValue(out.Set.Algorithm)
+	state.CreatedAt = types.StringValue(out.Set.CreatedAt.Format(timeFormat))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
