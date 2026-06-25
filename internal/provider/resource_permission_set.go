@@ -131,7 +131,7 @@ func (r *PermissionSetResource) Create(ctx context.Context, req resource.CreateR
 		Permissions: permissionsToWire(plan.Permissions),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Create permission set failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Create permission set failed", err, permissionSetFields)
 		return
 	}
 	plan.ID = types.StringValue(out.ID)
@@ -153,7 +153,7 @@ func (r *PermissionSetResource) Read(ctx context.Context, req resource.ReadReque
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Read permission set failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Read permission set failed", err, permissionSetFields)
 		return
 	}
 	state.Name = types.StringValue(out.Name)
@@ -176,7 +176,7 @@ func (r *PermissionSetResource) Update(ctx context.Context, req resource.UpdateR
 		Permissions: permissionsToWire(plan.Permissions),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Update permission set failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Update permission set failed", err, permissionSetFields)
 		return
 	}
 	plan.Permissions = permissionsFromWire(out.Permissions)
@@ -191,7 +191,7 @@ func (r *PermissionSetResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 	if err := r.client.PermissionSets.Delete(ctx, state.ID.ValueString()); err != nil && !management.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete permission set failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Delete permission set failed", err, permissionSetFields)
 	}
 }
 
