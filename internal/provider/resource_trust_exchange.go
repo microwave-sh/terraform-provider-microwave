@@ -39,11 +39,13 @@ type trustExchangeModel struct {
 	DiscoveryURL     types.String `tfsdk:"discovery_url"`
 	JWKSURL          types.String `tfsdk:"jwks_url"`
 	AllowedAudiences types.List   `tfsdk:"allowed_audiences"`
-	Policy           types.String `tfsdk:"policy"`
-	OutputKeySpecID  types.String `tfsdk:"output_key_spec_id"`
-	Active           types.Bool   `tfsdk:"active"`
-	CreatedAt        types.String `tfsdk:"created_at"`
-	UpdatedAt        types.String `tfsdk:"updated_at"`
+	Policy               types.String `tfsdk:"policy"`
+	OutputKeySpecID      types.String `tfsdk:"output_key_spec_id"`
+	Active               types.Bool   `tfsdk:"active"`
+	UpstreamClientID     types.String `tfsdk:"upstream_client_id"`
+	UpstreamClientSecret types.String `tfsdk:"upstream_client_secret"`
+	CreatedAt            types.String `tfsdk:"created_at"`
+	UpdatedAt            types.String `tfsdk:"updated_at"`
 }
 
 func NewTrustExchangeResource() resource.Resource { return &TrustExchangeResource{} }
@@ -122,6 +124,15 @@ func (r *TrustExchangeResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 				Description: "When false, inbound exchanges are rejected immediately. Defaults to true.",
+			},
+			"upstream_client_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "OIDC relying-party client id Microwave uses to broker an interactive login (authorization-code / device) at the exchange's upstream issuer. Set together with upstream_client_secret to enable brokered CLI login.",
+			},
+			"upstream_client_secret": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "OIDC relying-party client secret for the brokered interactive login. Write-only: the API never returns it, so it is not refreshed from the server and the configured value is retained in state. Leave unset to keep a previously-configured secret unchanged.",
 			},
 			"created_at": schema.StringAttribute{
 				Computed:      true,
@@ -229,6 +240,15 @@ func trustExchangeToWire(ctx context.Context, m *trustExchangeModel) (*managemen
 		v := m.Active.ValueBool()
 		in.Active = &v
 	}
+	if v := m.UpstreamClientID; !v.IsNull() && !v.IsUnknown() {
+		in.UpstreamClientID = v.ValueString()
+	}
+	// Write-only: send the secret only when one is supplied. An unset/empty value
+	// leaves any previously-configured secret unchanged (the API never returns it
+	// to diff against, and sending "" would clear it).
+	if v := m.UpstreamClientSecret; !v.IsNull() && !v.IsUnknown() && v.ValueString() != "" {
+		in.UpstreamClientSecret = v.ValueString()
+	}
 	return in, diags
 }
 
@@ -255,6 +275,11 @@ func trustExchangeFromWire(ctx context.Context, m *trustExchangeModel, out *mana
 	m.Policy = types.StringValue(out.Policy)
 	m.OutputKeySpecID = types.StringValue(out.OutputKeySpecID)
 	m.Active = types.BoolValue(out.Active)
+	if out.UpstreamClientID != "" {
+		m.UpstreamClientID = types.StringValue(out.UpstreamClientID)
+	}
+	// upstream_client_secret is write-only: the API never returns it, so the
+	// configured value in state is left untouched here.
 	m.CreatedAt = types.StringValue(out.CreatedAt.Format(timeFormat))
 	m.UpdatedAt = types.StringValue(out.UpdatedAt.Format(timeFormat))
 	return diags
