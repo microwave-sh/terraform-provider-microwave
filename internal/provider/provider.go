@@ -180,7 +180,7 @@ func (p *MicrowaveProvider) Configure(ctx context.Context, req provider.Configur
 		}
 		sessionJWT, err := redeemSessionJWT(ctx, authEndpoint, exchangeID, token)
 		if err != nil {
-			resp.Diagnostics.AddError("Token exchange failed", err.Error())
+			addAPIError(&resp.Diagnostics, "Token exchange failed", err, nil)
 			return
 		}
 		p.buildClient(ctx, endpoint, workspaceID, sessionJWT, resp)
@@ -201,7 +201,7 @@ func (p *MicrowaveProvider) Configure(ctx context.Context, req provider.Configur
 		}
 		sessionJWT, err := redeemFederationSessionJWT(ctx, endpoint, federationID, token)
 		if err != nil {
-			resp.Diagnostics.AddError("Federation redemption failed", err.Error())
+			addAPIError(&resp.Diagnostics, "Federation redemption failed", err, nil)
 			return
 		}
 		p.buildClient(ctx, endpoint, workspaceID, sessionJWT, resp)
@@ -285,7 +285,17 @@ func redeemFederationSessionJWT(ctx context.Context, endpoint, federationID, ext
 		return "", fmt.Errorf("microwave: read federation redemption response: %w", readErr)
 	}
 	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("microwave: federation redemption failed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+		// Parse the server's error envelope into a *management.Error so the caller
+		// surfaces the clean title/detail instead of a raw JSON dump.
+		apiErr := &management.Error{StatusCode: resp.StatusCode, RawBody: strings.TrimSpace(string(respBody))}
+		_ = json.Unmarshal(respBody, apiErr)
+		if apiErr.StatusCode == 0 {
+			apiErr.StatusCode = resp.StatusCode
+		}
+		if apiErr.Title == "" {
+			apiErr.Title = http.StatusText(resp.StatusCode)
+		}
+		return "", apiErr
 	}
 	var result management.RedeemFederationResult
 	if err := json.Unmarshal(respBody, &result); err != nil {

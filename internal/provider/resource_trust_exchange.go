@@ -158,7 +158,7 @@ func (r *TrustExchangeResource) Create(ctx context.Context, req resource.CreateR
 	}
 	out, err := r.client.TrustExchanges.Create(ctx, in)
 	if err != nil {
-		resp.Diagnostics.AddError("Create trust exchange failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Create trust exchange failed", err, trustExchangeFields)
 		return
 	}
 	resp.Diagnostics.Append(trustExchangeFromWire(ctx, &plan, out)...)
@@ -177,7 +177,7 @@ func (r *TrustExchangeResource) Read(ctx context.Context, req resource.ReadReque
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Read trust exchange failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Read trust exchange failed", err, trustExchangeFields)
 		return
 	}
 	resp.Diagnostics.Append(trustExchangeFromWire(ctx, &state, out)...)
@@ -197,7 +197,7 @@ func (r *TrustExchangeResource) Update(ctx context.Context, req resource.UpdateR
 	}
 	out, err := r.client.TrustExchanges.Update(ctx, plan.ID.ValueString(), in)
 	if err != nil {
-		resp.Diagnostics.AddError("Update trust exchange failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Update trust exchange failed", err, trustExchangeFields)
 		return
 	}
 	resp.Diagnostics.Append(trustExchangeFromWire(ctx, &plan, out)...)
@@ -211,7 +211,7 @@ func (r *TrustExchangeResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 	if err := r.client.TrustExchanges.Delete(ctx, state.ID.ValueString()); err != nil && !management.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete trust exchange failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Delete trust exchange failed", err, trustExchangeFields)
 	}
 }
 

@@ -123,7 +123,7 @@ func (r *TrustProviderResource) Create(ctx context.Context, req resource.CreateR
 	}
 	out, err := r.client.TrustProviders.Create(ctx, trustProviderToWire(&plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Create trust provider failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Create trust provider failed", err, trustProviderFields)
 		return
 	}
 	trustProviderFromWire(&plan, out)
@@ -142,7 +142,7 @@ func (r *TrustProviderResource) Read(ctx context.Context, req resource.ReadReque
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Read trust provider failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Read trust provider failed", err, trustProviderFields)
 		return
 	}
 	trustProviderFromWire(&state, out)
@@ -157,7 +157,7 @@ func (r *TrustProviderResource) Update(ctx context.Context, req resource.UpdateR
 	}
 	out, err := r.client.TrustProviders.Update(ctx, plan.ID.ValueString(), trustProviderToWire(&plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Update trust provider failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Update trust provider failed", err, trustProviderFields)
 		return
 	}
 	trustProviderFromWire(&plan, out)
@@ -171,7 +171,7 @@ func (r *TrustProviderResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 	if err := r.client.TrustProviders.Delete(ctx, state.ID.ValueString()); err != nil && !management.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete trust provider failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Delete trust provider failed", err, trustProviderFields)
 	}
 }
 

@@ -76,7 +76,7 @@ func (d *PermissionSetDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 	out, err := d.client.PermissionSets.Get(ctx, cfg.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Lookup permission set failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Lookup permission set failed", err, nil)
 		return
 	}
 	cfg.Name = types.StringValue(out.Name)
@@ -138,7 +138,7 @@ func (d *SigningKeySetDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 	out, err := d.client.SigningKeySets.Get(ctx, management.SigningKeySetKind(cfg.Kind.ValueString()), cfg.Name.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Lookup signing key set failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Lookup signing key set failed", err, nil)
 		return
 	}
 	cfg.ID = types.StringValue(out.Set.ID)
@@ -220,7 +220,7 @@ func (d *KeySpecDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 	out, err := d.client.KeySpecs.Get(ctx, cfg.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Lookup key spec failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Lookup key spec failed", err, nil)
 		return
 	}
 	keySpecFromWire(&cfg, out)
@@ -284,7 +284,7 @@ func (d *TrustExchangeDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 	out, err := d.client.TrustExchanges.Get(ctx, cfg.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Lookup trust exchange failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Lookup trust exchange failed", err, nil)
 		return
 	}
 	resp.Diagnostics.Append(trustExchangeFromWire(ctx, &cfg, out)...)
@@ -344,7 +344,7 @@ func (d *TrustProviderDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 	out, err := d.client.TrustProviders.Get(ctx, cfg.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Lookup trust provider failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Lookup trust provider failed", err, nil)
 		return
 	}
 	trustProviderFromWire(&cfg, out)

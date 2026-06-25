@@ -116,7 +116,7 @@ func (r *TrustFederationBindingResource) Create(ctx context.Context, req resourc
 	}
 	out, err := r.client.TrustFederationBindings.Create(ctx, trustFederationBindingToWire(&plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Create Trust Federation Binding failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Create Trust Federation Binding failed", err, trustFederationBindingFields)
 		return
 	}
 	trustFederationBindingFromWire(&plan, out)
@@ -135,7 +135,7 @@ func (r *TrustFederationBindingResource) Read(ctx context.Context, req resource.
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Read Trust Federation Binding failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Read Trust Federation Binding failed", err, trustFederationBindingFields)
 		return
 	}
 	trustFederationBindingFromWire(&state, out)
@@ -161,7 +161,7 @@ func (r *TrustFederationBindingResource) Delete(ctx context.Context, req resourc
 		return
 	}
 	if err := r.client.TrustFederationBindings.Delete(ctx, state.ID.ValueString()); err != nil && !management.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete Trust Federation Binding failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Delete Trust Federation Binding failed", err, trustFederationBindingFields)
 	}
 }
 

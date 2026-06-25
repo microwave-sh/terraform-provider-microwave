@@ -101,7 +101,7 @@ func (r *SigningKeySetResource) Create(ctx context.Context, req resource.CreateR
 		Algorithm: plan.Algorithm.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Create signing key set failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Create signing key set failed", err, signingKeySetFields)
 		return
 	}
 	plan.ID = types.StringValue(out.ID)
@@ -121,7 +121,7 @@ func (r *SigningKeySetResource) Read(ctx context.Context, req resource.ReadReque
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Read signing key set failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Read signing key set failed", err, signingKeySetFields)
 		return
 	}
 	state.ID = types.StringValue(out.Set.ID)
@@ -146,7 +146,7 @@ func (r *SigningKeySetResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 	err := r.client.SigningKeySets.Delete(ctx, management.SigningKeySetKind(state.Kind.ValueString()), state.Name.ValueString())
 	if err != nil && !management.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete signing key set failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Delete signing key set failed", err, signingKeySetFields)
 	}
 }
 

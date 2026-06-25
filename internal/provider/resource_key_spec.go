@@ -240,7 +240,7 @@ func (r *KeySpecResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 	out, err := r.client.KeySpecs.Create(ctx, keySpecToWire(&plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Create key spec failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Create key spec failed", err, keySpecFields)
 		return
 	}
 	keySpecFromWire(&plan, out)
@@ -259,7 +259,7 @@ func (r *KeySpecResource) Read(ctx context.Context, req resource.ReadRequest, re
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Read key spec failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Read key spec failed", err, keySpecFields)
 		return
 	}
 	keySpecFromWire(&state, out)
@@ -274,7 +274,7 @@ func (r *KeySpecResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 	out, err := r.client.KeySpecs.Update(ctx, plan.ID.ValueString(), keySpecToWire(&plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Update key spec failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Update key spec failed", err, keySpecFields)
 		return
 	}
 	keySpecFromWire(&plan, out)
@@ -288,7 +288,7 @@ func (r *KeySpecResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 	if err := r.client.KeySpecs.Delete(ctx, state.ID.ValueString()); err != nil && !management.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete key spec failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Delete key spec failed", err, keySpecFields)
 	}
 }
 

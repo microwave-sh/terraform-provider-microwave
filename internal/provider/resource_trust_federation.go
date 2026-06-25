@@ -146,7 +146,7 @@ func (r *TrustFederationResource) Create(ctx context.Context, req resource.Creat
 	}
 	out, err := r.client.TrustFederations.Create(ctx, in)
 	if err != nil {
-		resp.Diagnostics.AddError("Create Trust Federation failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Create Trust Federation failed", err, trustFederationFields)
 		return
 	}
 	resp.Diagnostics.Append(trustFederationFromWire(ctx, &plan, out)...)
@@ -165,7 +165,7 @@ func (r *TrustFederationResource) Read(ctx context.Context, req resource.ReadReq
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Read Trust Federation failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Read Trust Federation failed", err, trustFederationFields)
 		return
 	}
 	resp.Diagnostics.Append(trustFederationFromWire(ctx, &state, out)...)
@@ -190,7 +190,7 @@ func (r *TrustFederationResource) Update(ctx context.Context, req resource.Updat
 	}
 	out, err := r.client.TrustFederations.Update(ctx, state.ID.ValueString(), patch)
 	if err != nil {
-		resp.Diagnostics.AddError("Update Trust Federation failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Update Trust Federation failed", err, trustFederationFields)
 		return
 	}
 	resp.Diagnostics.Append(trustFederationFromWire(ctx, &plan, out)...)
@@ -204,7 +204,7 @@ func (r *TrustFederationResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 	if err := r.client.TrustFederations.Delete(ctx, state.ID.ValueString()); err != nil && !management.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete Trust Federation failed", err.Error())
+		addAPIError(&resp.Diagnostics, "Delete Trust Federation failed", err, trustFederationFields)
 	}
 }
 
