@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -22,27 +23,29 @@ var (
 	_ resource.ResourceWithImportState = &KeySpecResource{}
 )
 
-// KeySpecResource manages a Microwave key specification. v0.1 covers the
-// fields a Sandbar-style workspace needs to provision: name, description,
-// format axis, permission set + signing key set bindings, the format-specific
-// opaque/jwt config, and the expiry policy. Claims contract, override policy,
-// and webhook config are deferred to v0.2.
+// KeySpecResource manages a Microwave key specification. It covers the fields a
+// Sandbar-style workspace needs to provision: name, description, format axis,
+// permission set + signing key set bindings, the format-specific opaque/jwt
+// config, the expiry policy, and allow_unlisted_claims. The per-claim row
+// contract is left server-managed (the server seeds the standard rows); the
+// override policy and webhook config are not yet exposed.
 type KeySpecResource struct {
 	client *management.Client
 }
 
 type keySpecModel struct {
-	ID              types.String         `tfsdk:"id"`
-	Name            types.String         `tfsdk:"name"`
-	Description     types.String         `tfsdk:"description"`
-	Format          types.String         `tfsdk:"format"`
-	PermissionSetID types.String         `tfsdk:"permission_set_id"`
-	SigningKeySetID types.String         `tfsdk:"signing_key_set_id"`
-	Opaque          *opaqueConfigModel   `tfsdk:"opaque"`
-	JWT             *jwtConfigModel      `tfsdk:"jwt"`
-	Expiry          *expiryPolicyModel   `tfsdk:"expiry"`
-	CreatedAt       types.String         `tfsdk:"created_at"`
-	UpdatedAt       types.String         `tfsdk:"updated_at"`
+	ID                  types.String       `tfsdk:"id"`
+	Name                types.String       `tfsdk:"name"`
+	Description         types.String       `tfsdk:"description"`
+	Format              types.String       `tfsdk:"format"`
+	PermissionSetID     types.String       `tfsdk:"permission_set_id"`
+	SigningKeySetID     types.String       `tfsdk:"signing_key_set_id"`
+	Opaque              *opaqueConfigModel `tfsdk:"opaque"`
+	JWT                 *jwtConfigModel    `tfsdk:"jwt"`
+	Expiry              *expiryPolicyModel `tfsdk:"expiry"`
+	AllowUnlistedClaims types.Bool         `tfsdk:"allow_unlisted_claims"`
+	CreatedAt           types.String       `tfsdk:"created_at"`
+	UpdatedAt           types.String       `tfsdk:"updated_at"`
 }
 
 type opaqueConfigModel struct {
@@ -165,6 +168,12 @@ func (r *KeySpecResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					},
 				},
 			},
+			"allow_unlisted_claims": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				Description: "When true, tokens minted from this spec may carry claims not named in the claim contract (e.g. a workspace_id stamped by a trust-exchange policy). When false, an unlisted claim is rejected at mint time. The per-claim rows themselves stay server-managed.",
+			},
 			"created_at": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -255,6 +264,9 @@ func keySpecToWire(m *keySpecModel) *management.KeySpecInput {
 			AllowNever:           m.Expiry.AllowNever.ValueBool(),
 			RotationReminderDays: int(m.Expiry.RotationReminderDays.ValueInt64()),
 		},
+		// Leave Claims.Claims nil so the server seeds + manages the standard rows;
+		// only the allow_unlisted lever is IaC-controlled.
+		Claims: management.ClaimsConfig{AllowUnlisted: m.AllowUnlistedClaims.ValueBool()},
 	}
 	if m.Opaque != nil {
 		in.Opaque = management.OpaqueConfig{Prefix: m.Opaque.Prefix.ValueString()}
@@ -293,6 +305,7 @@ func keySpecFromWire(m *keySpecModel, out *management.KeySpec) {
 		AllowNever:           types.BoolValue(out.Expiry.AllowNever),
 		RotationReminderDays: types.Int64Value(int64(out.Expiry.RotationReminderDays)),
 	}
+	m.AllowUnlistedClaims = types.BoolValue(out.Claims.AllowUnlisted)
 	m.CreatedAt = types.StringValue(out.CreatedAt.Format(timeFormat))
 	m.UpdatedAt = types.StringValue(out.UpdatedAt.Format(timeFormat))
 }

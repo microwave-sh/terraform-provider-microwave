@@ -176,8 +176,8 @@ func TestTrustFederationResource_UpdatePatch(t *testing.T) {
 	if diags.HasError() {
 		t.Fatalf("trustFederationUpdatePatch: %v", diags)
 	}
-	if patch.Label == nil || *patch.Label != "Updated Label" {
-		t.Errorf("Label patch: got %v", patch.Label)
+	if patch.Label != "Updated Label" {
+		t.Errorf("Label patch: got %q", patch.Label)
 	}
 	// Empty string description should be sent as &"" (clear).
 	if patch.Description == nil || *patch.Description != "" {

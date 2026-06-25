@@ -141,9 +141,9 @@ func (d *SigningKeySetDataSource) Read(ctx context.Context, req datasource.ReadR
 		resp.Diagnostics.AddError("Lookup signing key set failed", err.Error())
 		return
 	}
-	cfg.ID = types.StringValue(out.ID)
-	cfg.Algorithm = types.StringValue(out.Algorithm)
-	cfg.CreatedAt = types.StringValue(out.CreatedAt.Format(timeFormat))
+	cfg.ID = types.StringValue(out.Set.ID)
+	cfg.Algorithm = types.StringValue(out.Set.Algorithm)
+	cfg.CreatedAt = types.StringValue(out.Set.CreatedAt.Format(timeFormat))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &cfg)...)
 }
 

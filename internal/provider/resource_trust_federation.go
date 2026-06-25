@@ -238,9 +238,10 @@ func trustFederationToWire(ctx context.Context, m *trustFederationModel) (*manag
 func trustFederationUpdatePatch(ctx context.Context, plan, _ *trustFederationModel) (*management.TrustFederationUpdateInput, diagnostics) {
 	patch := &management.TrustFederationUpdateInput{}
 
-	// Label is required — always send it.
-	label := plan.Label.ValueString()
-	patch.Label = &label
+	// Label is required — always send it. The SDK models it as a plain string
+	// because the server cannot clear a label to "" (empty fails validation),
+	// so an empty value means "no change" rather than "clear".
+	patch.Label = plan.Label.ValueString()
 
 	setOptionalString := func(v types.String) *string {
 		if v.IsUnknown() {
