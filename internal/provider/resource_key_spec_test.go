@@ -78,6 +78,25 @@ func TestKeySpecToWire_ExplicitClaims(t *testing.T) {
 	}
 }
 
+// TestClaimsToWire_DefaultValue pins that a default/override row carries its
+// value through as a *any — required for the aud claim, since a JWT spec must
+// stamp an audience and session-token mints supply none inbound.
+func TestClaimsToWire_DefaultValue(t *testing.T) {
+	rows := claimsToWire([]claimPolicyModel{
+		{Key: types.StringValue("aud"), Mode: types.StringValue("default"), Type: types.StringValue("string"), Value: types.StringValue("https://api.sandbar.cloud")},
+		{Key: types.StringValue("workspace_id"), Mode: types.StringValue("allowed"), Type: types.StringValue("string")},
+	})
+	if rows[0].Value == nil {
+		t.Fatal("aud row Value = nil, want a default value")
+	}
+	if got := *rows[0].Value; got != "https://api.sandbar.cloud" {
+		t.Errorf("aud value = %v, want https://api.sandbar.cloud", got)
+	}
+	if rows[1].Value != nil {
+		t.Error("allowed row Value != nil, want nil (value-less)")
+	}
+}
+
 // TestClaimsToWire_NilWhenEmpty pins that an empty contract sends nil (not an
 // empty slice), so the server falls back to seeding the standard rows.
 func TestClaimsToWire_NilWhenEmpty(t *testing.T) {
