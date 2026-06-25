@@ -26,9 +26,8 @@ var (
 // KeySpecResource manages a Microwave key specification. It covers the fields a
 // Sandbar-style workspace needs to provision: name, description, format axis,
 // permission set + signing key set bindings, the format-specific opaque/jwt
-// config, the expiry policy, and allow_unlisted_claims. The per-claim row
-// contract is left server-managed (the server seeds the standard rows); the
-// override policy and webhook config are not yet exposed.
+// config, the expiry policy, and the claim contract (explicit rows +
+// allow_unlisted). The override policy and webhook config are not yet exposed.
 type KeySpecResource struct {
 	client *management.Client
 }
@@ -43,9 +42,21 @@ type keySpecModel struct {
 	Opaque              *opaqueConfigModel `tfsdk:"opaque"`
 	JWT                 *jwtConfigModel    `tfsdk:"jwt"`
 	Expiry              *expiryPolicyModel `tfsdk:"expiry"`
+	Claims              []claimPolicyModel `tfsdk:"claims"`
 	AllowUnlistedClaims types.Bool         `tfsdk:"allow_unlisted_claims"`
 	CreatedAt           types.String       `tfsdk:"created_at"`
 	UpdatedAt           types.String       `tfsdk:"updated_at"`
+}
+
+// claimPolicyModel is one row of the claim contract. Declaring any rows turns
+// off the server's standard-claim seeding, so a spec that lists rows must list
+// every claim it wants (including sub, if the subject should be stamped).
+type claimPolicyModel struct {
+	Key         types.String `tfsdk:"key"`
+	Mode        types.String `tfsdk:"mode"`
+	Type        types.String `tfsdk:"type"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
 }
 
 type opaqueConfigModel struct {
@@ -168,11 +179,42 @@ func (r *KeySpecResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					},
 				},
 			},
+			"claims": schema.SetNestedAttribute{
+				Optional:    true,
+				Description: "Explicit claim contract. Declaring any row turns off the server's standard-claim seeding, so list every claim the spec needs — including \"sub\" if the subject should be stamped into the token. Leave unset to let the server seed and manage the standard rows.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"key": schema.StringAttribute{
+							Required:    true,
+							Description: "Claim name (e.g. \"workspace_id\", \"sub\"). The envelope claims iss/exp/iat/nbf/jti are reserved and cannot be set here.",
+						},
+						"mode": schema.StringAttribute{
+							Required:    true,
+							Description: "not_allowed (reject if present), allowed (pass through if present), or required (must be present).",
+							Validators: []validator.String{
+								stringvalidator.OneOf("not_allowed", "allowed", "required"),
+							},
+						},
+						"type": schema.StringAttribute{
+							Optional:    true,
+							Description: "Value type the claim is checked against: string, number, boolean, object, or array. Omit to skip type checking.",
+						},
+						"name": schema.StringAttribute{
+							Optional:    true,
+							Description: "Human-readable label for the claim.",
+						},
+						"description": schema.StringAttribute{
+							Optional:    true,
+							Description: "Longer description of the claim.",
+						},
+					},
+				},
+			},
 			"allow_unlisted_claims": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
-				Description: "When true, tokens minted from this spec may carry claims not named in the claim contract (e.g. a workspace_id stamped by a trust-exchange policy). When false, an unlisted claim is rejected at mint time. The per-claim rows themselves stay server-managed.",
+				Description: "When true, tokens minted from this spec may carry claims not named in the claim contract (e.g. a workspace_id stamped by a trust-exchange policy). When false, an unlisted claim is rejected at mint time.",
 			},
 			"created_at": schema.StringAttribute{
 				Computed:      true,
@@ -264,9 +306,13 @@ func keySpecToWire(m *keySpecModel) *management.KeySpecInput {
 			AllowNever:           m.Expiry.AllowNever.ValueBool(),
 			RotationReminderDays: int(m.Expiry.RotationReminderDays.ValueInt64()),
 		},
-		// Leave Claims.Claims nil so the server seeds + manages the standard rows;
-		// only the allow_unlisted lever is IaC-controlled.
-		Claims: management.ClaimsConfig{AllowUnlisted: m.AllowUnlistedClaims.ValueBool()},
+		// When no rows are declared, leave Claims.Claims nil so the server seeds +
+		// manages the standard rows; declaring rows sends the full contract and
+		// turns seeding off.
+		Claims: management.ClaimsConfig{
+			Claims:        claimsToWire(m.Claims),
+			AllowUnlisted: m.AllowUnlistedClaims.ValueBool(),
+		},
 	}
 	if m.Opaque != nil {
 		in.Opaque = management.OpaqueConfig{Prefix: m.Opaque.Prefix.ValueString()}
@@ -275,6 +321,26 @@ func keySpecToWire(m *keySpecModel) *management.KeySpecInput {
 		in.JWT = management.JWTConfig{Algorithm: m.JWT.Algorithm.ValueString()}
 	}
 	return in
+}
+
+// claimsToWire maps the declared claim rows to the API shape. Returns nil (not
+// an empty slice) when no rows are declared, so the server falls back to seeding
+// the standard rows.
+func claimsToWire(in []claimPolicyModel) []management.ClaimPolicy {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]management.ClaimPolicy, 0, len(in))
+	for _, c := range in {
+		out = append(out, management.ClaimPolicy{
+			Key:         c.Key.ValueString(),
+			Mode:        c.Mode.ValueString(),
+			Type:        c.Type.ValueString(),
+			Name:        c.Name.ValueString(),
+			Description: c.Description.ValueString(),
+		})
+	}
+	return out
 }
 
 func keySpecFromWire(m *keySpecModel, out *management.KeySpec) {
