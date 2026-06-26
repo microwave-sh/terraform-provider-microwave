@@ -27,7 +27,7 @@ func TestTrustExchangeResource_Schema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("Schema diagnostics: %v", resp.Diagnostics)
 	}
-	for _, name := range []string{"upstream_client_id", "upstream_client_secret"} {
+	for _, name := range []string{"upstream_client_id", "upstream_client_secret", "verification_uri"} {
 		if _, ok := resp.Schema.Attributes[name]; !ok {
 			t.Errorf("schema missing attribute %q", name)
 		}
@@ -35,6 +35,18 @@ func TestTrustExchangeResource_Schema(t *testing.T) {
 	// The upstream client secret is write-only and must be marked sensitive.
 	if !resp.Schema.Attributes["upstream_client_secret"].IsSensitive() {
 		t.Error("upstream_client_secret must be Sensitive")
+	}
+	// verification_uri is Optional (so exchanges without it plan clean) and is a
+	// normal readable attribute — not sensitive, not required.
+	vu := resp.Schema.Attributes["verification_uri"]
+	if !vu.IsOptional() {
+		t.Error("verification_uri must be Optional")
+	}
+	if vu.IsRequired() {
+		t.Error("verification_uri must not be Required")
+	}
+	if vu.IsSensitive() {
+		t.Error("verification_uri must not be Sensitive")
 	}
 }
 
@@ -87,6 +99,57 @@ func TestTrustExchangeResource_ToWire_UpstreamCredentials(t *testing.T) {
 	}
 	if in2.UpstreamClientID != "rp_client_123" {
 		t.Errorf("UpstreamClientID: got %q, want rp_client_123", in2.UpstreamClientID)
+	}
+}
+
+func TestTrustExchangeResource_VerificationURI_RoundTrip(t *testing.T) {
+	ctx := context.Background()
+
+	// Set → sent on the wire.
+	model := exchangeModelWithAudiences(t, ctx)
+	model.VerificationURI = types.StringValue("https://app.sandbar.cloud/device")
+	in, diags := trustExchangeToWire(ctx, model)
+	if diags.HasError() {
+		t.Fatalf("trustExchangeToWire: %v", diags)
+	}
+	if in.VerificationURI != "https://app.sandbar.cloud/device" {
+		t.Errorf("VerificationURI: got %q, want https://app.sandbar.cloud/device", in.VerificationURI)
+	}
+
+	// Unset → omitted (empty), so an exchange that never set it plans clean.
+	noVU := exchangeModelWithAudiences(t, ctx)
+	noVU.VerificationURI = types.StringNull()
+	in2, diags := trustExchangeToWire(ctx, noVU)
+	if diags.HasError() {
+		t.Fatalf("trustExchangeToWire (no verification_uri): %v", diags)
+	}
+	if in2.VerificationURI != "" {
+		t.Errorf("VerificationURI should be omitted when unset, got %q", in2.VerificationURI)
+	}
+
+	// Readable: the server value refreshes back into the model (unlike the
+	// write-only secret).
+	now := time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)
+	out := &management.TrustExchange{
+		ID:               "ex_cli",
+		Name:             "cli-via-clerk",
+		Type:             "oidc",
+		Provider:         management.TrustExchangeProviderClerk,
+		Issuer:           "https://clerk.sandbar.cloud",
+		AllowedAudiences: []string{"api://prod"},
+		Policy:           "assertion.subject != ''",
+		OutputKeySpecID:  "spec_cli",
+		Active:           true,
+		VerificationURI:  "https://app.sandbar.cloud/device",
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	m := &trustExchangeModel{}
+	if diags := trustExchangeFromWire(ctx, m, out); diags.HasError() {
+		t.Fatalf("trustExchangeFromWire: %v", diags)
+	}
+	if m.VerificationURI.ValueString() != "https://app.sandbar.cloud/device" {
+		t.Errorf("VerificationURI not refreshed from server: got %q, want https://app.sandbar.cloud/device", m.VerificationURI.ValueString())
 	}
 }
 

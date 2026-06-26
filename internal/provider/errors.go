@@ -104,6 +104,7 @@ var trustExchangeFields = map[string]string{
 	"active":                 "active",
 	"upstream_client_id":     "upstream_client_id",
 	"upstream_client_secret": "upstream_client_secret",
+	"verification_uri":       "verification_uri",
 }
 
 var permissionSetFields = map[string]string{

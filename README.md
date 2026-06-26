@@ -83,6 +83,7 @@ resource "microwave_trust_exchange" "cli_via_clerk" {
   provider          = "clerk"
   issuer            = "https://clerk.sandbar.cloud"
   allowed_audiences = ["https://api.sandbar.cloud"]
+  verification_uri  = "https://app.sandbar.cloud/device"
   output_key_spec_id = microwave_key_spec.cli_session.id
   policy = <<-CEL
     assertion.permissions.exists(p, p == "session:approve") &&
