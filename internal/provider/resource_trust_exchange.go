@@ -30,20 +30,21 @@ type TrustExchangeResource struct {
 }
 
 type trustExchangeModel struct {
-	ID               types.String `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	Description      types.String `tfsdk:"description"`
-	Type             types.String `tfsdk:"type"`
-	OIDCProvider     types.String `tfsdk:"oidc_provider"`
-	Issuer           types.String `tfsdk:"issuer"`
-	DiscoveryURL     types.String `tfsdk:"discovery_url"`
-	JWKSURL          types.String `tfsdk:"jwks_url"`
-	AllowedAudiences types.List   `tfsdk:"allowed_audiences"`
+	ID                   types.String `tfsdk:"id"`
+	Name                 types.String `tfsdk:"name"`
+	Description          types.String `tfsdk:"description"`
+	Type                 types.String `tfsdk:"type"`
+	OIDCProvider         types.String `tfsdk:"oidc_provider"`
+	Issuer               types.String `tfsdk:"issuer"`
+	DiscoveryURL         types.String `tfsdk:"discovery_url"`
+	JWKSURL              types.String `tfsdk:"jwks_url"`
+	AllowedAudiences     types.List   `tfsdk:"allowed_audiences"`
 	Policy               types.String `tfsdk:"policy"`
 	OutputKeySpecID      types.String `tfsdk:"output_key_spec_id"`
 	Active               types.Bool   `tfsdk:"active"`
 	UpstreamClientID     types.String `tfsdk:"upstream_client_id"`
 	UpstreamClientSecret types.String `tfsdk:"upstream_client_secret"`
+	VerificationURI      types.String `tfsdk:"verification_uri"`
 	CreatedAt            types.String `tfsdk:"created_at"`
 	UpdatedAt            types.String `tfsdk:"updated_at"`
 }
@@ -133,6 +134,10 @@ func (r *TrustExchangeResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Sensitive:   true,
 				Description: "OIDC relying-party client secret for the brokered interactive login. Write-only: the API never returns it, so it is not refreshed from the server and the configured value is retained in state. Leave unset to keep a previously-configured secret unchanged.",
+			},
+			"verification_uri": schema.StringAttribute{
+				Optional:    true,
+				Description: "Static console page operators are sent to to approve a device-flow login that mints through this exchange (e.g. https://app.sandbar.cloud/device). Returned on the device request's verification_uri.",
 			},
 			"created_at": schema.StringAttribute{
 				Computed:      true,
@@ -243,6 +248,9 @@ func trustExchangeToWire(ctx context.Context, m *trustExchangeModel) (*managemen
 	if v := m.UpstreamClientID; !v.IsNull() && !v.IsUnknown() {
 		in.UpstreamClientID = v.ValueString()
 	}
+	if v := m.VerificationURI; !v.IsNull() && !v.IsUnknown() {
+		in.VerificationURI = v.ValueString()
+	}
 	// Write-only: send the secret only when one is supplied. An unset/empty value
 	// leaves any previously-configured secret unchanged (the API never returns it
 	// to diff against, and sending "" would clear it).
@@ -277,6 +285,9 @@ func trustExchangeFromWire(ctx context.Context, m *trustExchangeModel, out *mana
 	m.Active = types.BoolValue(out.Active)
 	if out.UpstreamClientID != "" {
 		m.UpstreamClientID = types.StringValue(out.UpstreamClientID)
+	}
+	if out.VerificationURI != "" {
+		m.VerificationURI = types.StringValue(out.VerificationURI)
 	}
 	// upstream_client_secret is write-only: the API never returns it, so the
 	// configured value in state is left untouched here.
