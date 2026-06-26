@@ -80,7 +80,7 @@ resource "microwave_key_spec" "cli_session" {
 resource "microwave_trust_exchange" "cli_via_clerk" {
   name              = "sandbar-cli-session-exchange"
   type              = "oidc"
-  provider          = "clerk"
+  oidc_provider     = "clerk"
   issuer            = "https://clerk.sandbar.cloud"
   allowed_audiences = ["https://api.sandbar.cloud"]
   verification_uri  = "https://app.sandbar.cloud/device"
