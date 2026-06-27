@@ -34,12 +34,12 @@ type TrustFederationBindingResource struct {
 }
 
 type trustFederationBindingModel struct {
-	ID           types.String            `tfsdk:"id"`
-	FederationKey types.String           `tfsdk:"federation_key"`
-	Identity     map[string]types.String `tfsdk:"identity"`
-	OutputClaims map[string]types.String `tfsdk:"output_claims"`
-	CreatedAt    types.String            `tfsdk:"created_at"`
-	UpdatedAt    types.String            `tfsdk:"updated_at"`
+	ID            types.String            `tfsdk:"id"`
+	FederationKey types.String            `tfsdk:"federation_key"`
+	Identity      map[string]types.String `tfsdk:"identity"`
+	OutputClaims  map[string]types.String `tfsdk:"output_claims"`
+	CreatedAt     types.String            `tfsdk:"created_at"`
+	UpdatedAt     types.String            `tfsdk:"updated_at"`
 }
 
 func NewTrustFederationBindingResource() resource.Resource {
