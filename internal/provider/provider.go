@@ -279,7 +279,7 @@ func redeemFederationSessionJWT(ctx context.Context, endpoint, federationID, ext
 	if err != nil {
 		return "", fmt.Errorf("microwave: federation redemption request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	respBody, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		return "", fmt.Errorf("microwave: read federation redemption response: %w", readErr)

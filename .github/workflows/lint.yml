@@ -1,0 +1,36 @@
+# golangci-lint: static analysis on every PR and push to main. Lint only —
+# acceptance tests (TF_ACC) are not run here.
+#
+# golangci-lint v2 requires golangci-lint-action@v8; v6 ships the EOL v1 line
+# built with an older toolchain that can't load a go-1.26 module.
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  golangci-lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
