@@ -31,7 +31,7 @@ func TestTrustFederationResource_Schema(t *testing.T) {
 	wantAttrs := []string{
 		"id", "workspace_id", "key", "label",
 		"description", "logo_url", "docs_url",
-		"issuer", "audience", "identity_fields",
+		"issuer", "audience", "identity_fields", "glob_fields",
 		"output_key_spec_id", "policy_override",
 		"created_at", "updated_at",
 	}
@@ -188,6 +188,34 @@ func TestTrustFederationResource_UpdatePatch(t *testing.T) {
 	}
 	if len(patch.IdentityFields) != 1 {
 		t.Errorf("IdentityFields: expected 1, got %d", len(patch.IdentityFields))
+	}
+}
+
+func TestTrustFederationGlobFieldsRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	m := &trustFederationModel{}
+	// out has GlobFields from the API; fromWire must populate the model.
+	out := &management.TrustFederation{
+		IdentityFields: []string{"repository", "ref"},
+		GlobFields:     []string{"ref"},
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+	if diags := trustFederationFromWire(ctx, m, out); diags.HasError() {
+		t.Fatalf("fromWire: %v", diags)
+	}
+	var got []string
+	m.GlobFields.ElementsAs(ctx, &got, false)
+	if len(got) != 1 || got[0] != "ref" {
+		t.Fatalf("model.GlobFields = %v, want [ref]", got)
+	}
+	// toWire must send it back.
+	in, diags := trustFederationToWire(ctx, m)
+	if diags.HasError() {
+		t.Fatalf("toWire: %v", diags)
+	}
+	if len(in.GlobFields) != 1 || in.GlobFields[0] != "ref" {
+		t.Fatalf("wire.GlobFields = %v, want [ref]", in.GlobFields)
 	}
 }
 

@@ -122,6 +122,7 @@ var trustFederationFields = map[string]string{
 	"issuer":             "issuer",
 	"audience":           "audience",
 	"identity_fields":    "identity_fields",
+	"glob_fields":        "glob_fields",
 	"policy_override":    "policy_override",
 	"output_key_spec_id": "output_key_spec_id",
 	"logo_url":           "logo_url",

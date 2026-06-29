@@ -40,6 +40,7 @@ type trustFederationModel struct {
 	Issuer          types.String `tfsdk:"issuer"`
 	Audience        types.String `tfsdk:"audience"`
 	IdentityFields  types.List   `tfsdk:"identity_fields"`
+	GlobFields      types.List   `tfsdk:"glob_fields"`
 	OutputKeySpecID types.String `tfsdk:"output_key_spec_id"`
 	PolicyOverride  types.String `tfsdk:"policy_override"`
 	CreatedAt       types.String `tfsdk:"created_at"`
@@ -113,6 +114,11 @@ func (r *TrustFederationResource) Schema(_ context.Context, _ resource.SchemaReq
 				Required:    true,
 				ElementType: types.StringType,
 				Description: "Ordered list of OIDC claim names that together uniquely identify an entity in this federation. At least one required.",
+			},
+			"glob_fields": schema.ListAttribute{
+				Optional:    true,
+				ElementType: types.StringType,
+				Description: "Identity fields matched as glob patterns (trailing-* prefix or literal) instead of exact. Must be a subset of identity_fields.",
 			},
 			"output_key_spec_id": schema.StringAttribute{
 				Optional:    true,
@@ -218,6 +224,11 @@ func trustFederationToWire(ctx context.Context, m *trustFederationModel) (*manag
 	if diags.HasError() {
 		return nil, diags
 	}
+	globs, gdiags := stringListToSlice(ctx, m.GlobFields)
+	diags.Append(gdiags...)
+	if diags.HasError() {
+		return nil, diags
+	}
 	return &management.TrustFederationInput{
 		Key:             management.FederationKey(m.Key.ValueString()),
 		Label:           m.Label.ValueString(),
@@ -227,6 +238,7 @@ func trustFederationToWire(ctx context.Context, m *trustFederationModel) (*manag
 		Issuer:          m.Issuer.ValueString(),
 		Audience:        m.Audience.ValueString(),
 		IdentityFields:  fields,
+		GlobFields:      globs,
 		OutputKeySpecID: m.OutputKeySpecID.ValueString(),
 		PolicyOverride:  m.PolicyOverride.ValueString(),
 	}, diags
@@ -267,6 +279,14 @@ func trustFederationUpdatePatch(ctx context.Context, plan, _ *trustFederationMod
 		patch.IdentityFields = fields
 	}
 
+	if !plan.GlobFields.IsNull() && !plan.GlobFields.IsUnknown() {
+		globs, diags := stringListToSlice(ctx, plan.GlobFields)
+		if diags.HasError() {
+			return nil, diags
+		}
+		patch.GlobFields = globs
+	}
+
 	return patch, nil
 }
 
@@ -296,6 +316,12 @@ func trustFederationFromWire(ctx context.Context, m *trustFederationModel, out *
 		return diags
 	}
 	m.IdentityFields = fields
+	globs, gdiags := stringSliceToList(ctx, out.GlobFields)
+	diags.Append(gdiags...)
+	if diags.HasError() {
+		return diags
+	}
+	m.GlobFields = globs
 	if out.OutputKeySpecID != "" {
 		m.OutputKeySpecID = types.StringValue(out.OutputKeySpecID)
 	}
