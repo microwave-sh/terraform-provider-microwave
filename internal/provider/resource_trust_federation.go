@@ -316,12 +316,16 @@ func trustFederationFromWire(ctx context.Context, m *trustFederationModel, out *
 		return diags
 	}
 	m.IdentityFields = fields
-	globs, gdiags := stringSliceToList(ctx, out.GlobFields)
-	diags.Append(gdiags...)
-	if diags.HasError() {
-		return diags
+	if len(out.GlobFields) == 0 {
+		m.GlobFields = types.ListNull(types.StringType)
+	} else {
+		globs, gdiags := stringSliceToList(ctx, out.GlobFields)
+		diags.Append(gdiags...)
+		if diags.HasError() {
+			return diags
+		}
+		m.GlobFields = globs
 	}
-	m.GlobFields = globs
 	if out.OutputKeySpecID != "" {
 		m.OutputKeySpecID = types.StringValue(out.OutputKeySpecID)
 	}
